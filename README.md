@@ -4,5 +4,5 @@
 
 | Name Surname (initials) | GUID                                     |
 | ----------------------- | ---------------------------------------- |
-| AP                      | `{FD9D086C-532F-4AAC-BB99-69D7798837D8}` |
-| Anton Prykhodzka        | `{44FBFCF5-4430-4964-878D-1867DC679E0D}` |
+| AP                      | `{CB383B4F-5D43-495A-BDC9-49CC2BB08C45}` |
+| Anton Prykhodzka        | `{0A0AA8A2-9DFC-48BD-B7B0-61B205664181}` |
