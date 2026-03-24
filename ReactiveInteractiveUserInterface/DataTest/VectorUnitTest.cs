@@ -23,5 +23,13 @@ namespace TP.ConcurrentProgramming.Data.Test
       Assert.AreEqual<double>(XComponent, newInstance.x);
       Assert.AreEqual<double>(YComponent, newInstance.y);
     }
+
+    [TestMethod]
+    public void VectorZeroValuesTestMethod()
+    {
+      Vector zeroVector = new(0.0, 0.0);
+      Assert.AreEqual<double>(0.0, zeroVector.x);
+      Assert.AreEqual<double>(0.0, zeroVector.y);
+    }
   }
 }
