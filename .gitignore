@@ -1,0 +1,16 @@
+.vs/
+bin/
+obj/
+.git/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.user
+.vscode/
+/packages/
+
+# Materiały do nauki, głównie Piotrka
+SCIAGA/
+./SCIAGA
