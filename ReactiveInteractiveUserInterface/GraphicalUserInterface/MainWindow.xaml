@@ -8,6 +8,10 @@
             <TextBox Width="50" Text="{Binding BallCount, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,0,10,0"/>
             <Button Content="Start" Command="{Binding StartCommand}" VerticalAlignment="Center"/>
         </StackPanel>
+        <TextBlock Text="{Binding ErrorMessage}"
+           Foreground="Red"
+           HorizontalAlignment="Center"
+           Margin="0,5,0,0"/>
         <Border BorderThickness="4" BorderBrush="Green" Height="420" Width="400">
             <ItemsControl ItemsSource="{Binding Balls}">
                 <ItemsControl.ItemsPanel>

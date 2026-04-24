@@ -39,9 +39,34 @@ namespace TP.ConcurrentProgramming.Data
       NewPositionNotification?.Invoke(this, Position);
     }
 
-    internal void Move(Vector delta)
+    internal void Move(double boardWidth, double boardHeight, double ballDiameter)
     {
-      Position = new Vector(Position.x + delta.x, Position.y + delta.y);
+      double nextX = Position.x + Velocity.x;
+      double nextY = Position.y + Velocity.y;
+
+      if (nextX < 0)
+      {
+        nextX = 0;
+        Velocity = new Vector(-Velocity.x, Velocity.y);
+      }
+      else if (nextX > boardWidth - ballDiameter)
+      {
+        nextX = boardWidth - ballDiameter;
+        Velocity = new Vector(-Velocity.x, Velocity.y);
+      }
+
+      if (nextY < 0)
+      {
+        nextY = 0;
+        Velocity = new Vector(Velocity.x, -Velocity.y);
+      }
+      else if (nextY > boardHeight - ballDiameter)
+      {
+        nextY = boardHeight - ballDiameter;
+        Velocity = new Vector(Velocity.x, -Velocity.y);
+      }
+
+      Position = new Vector(nextX, nextY);
       RaiseNewPositionChangeNotification();
     }
 

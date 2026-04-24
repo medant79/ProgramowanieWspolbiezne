@@ -26,7 +26,7 @@ namespace TP.ConcurrentProgramming.Presentation.Model
     internal ModelImplementation(UnderneathLayerAPI underneathLayer)
     {
       layerBellow = underneathLayer == null ? UnderneathLayerAPI.GetBusinessLogicLayer() : underneathLayer;
-      eventObservable = Observable.FromEventPattern<BallChaneEventArgs>(this, "BallChanged");
+      eventObservable = Observable.FromEventPattern<BallChangeEventArgs>(this, "BallChanged");
     }
 
     #region ModelAbstractApi
@@ -46,27 +46,31 @@ namespace TP.ConcurrentProgramming.Presentation.Model
 
     public override void Start(int numberOfBalls)
     {
-      layerBellow.Start(numberOfBalls, StartHandler);
+        if (Disposed)
+            throw new ObjectDisposedException(nameof(ModelImplementation));
+        layerBellow.Start(numberOfBalls, StartHandler);
     }
 
     #endregion ModelAbstractApi
 
     #region API
 
-    public event EventHandler<BallChaneEventArgs> BallChanged;
+    public event EventHandler<BallChangeEventArgs> BallChanged;
 
     #endregion API
 
     #region private
 
     private bool Disposed = false;
-    private readonly IObservable<EventPattern<BallChaneEventArgs>> eventObservable = null;
+    private readonly IObservable<EventPattern<BallChangeEventArgs>> eventObservable = null;
     private readonly UnderneathLayerAPI layerBellow = null;
 
     private void StartHandler(BusinessLogic.IPosition position, BusinessLogic.IBall ball)
     {
-      ModelBall newBall = new ModelBall(position.x, position.y, ball) { Diameter = 20.0 };
-      BallChanged.Invoke(this, new BallChaneEventArgs() { Ball = newBall });
+      double scaleX = 1.0;
+      double scaleY = 1.0;
+      ModelBall newBall = new ModelBall(position.x, position.y, ball, scaleX, scaleY) { Diameter = 20.0 };
+      BallChanged?.Invoke(this, new BallChangeEventArgs() { Ball = newBall });
     }
 
     #endregion private
@@ -94,7 +98,7 @@ namespace TP.ConcurrentProgramming.Presentation.Model
     #endregion TestingInfrastructure
   }
 
-  public class BallChaneEventArgs : EventArgs
+  public class BallChangeEventArgs : EventArgs
   {
     public IBall Ball { get; init; }
   }
