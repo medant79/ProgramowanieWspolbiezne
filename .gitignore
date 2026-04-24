@@ -1,5 +1,18 @@
 .vs/
 bin/
 obj/
-.git/C#_LINUX_GUIDE.md
-.git/LIVE_DEMO_WYNIKI.md
+.git/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.user
+.vscode/
+/packages/
+
+# Materiały do nauki, głównie Piotrka
+SCIAGA/
+./SCIAGA
+MergeGitaNotatki/
+./MergeGitaNotatki
