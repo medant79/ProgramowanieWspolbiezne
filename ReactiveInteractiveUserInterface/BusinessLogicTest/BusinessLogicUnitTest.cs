@@ -56,6 +56,7 @@ namespace TP.ConcurrentProgramming.BusinessLogic.Test
           (startingPosition, ball) => { called++; Assert.IsNotNull(startingPosition); Assert.IsNotNull(ball); });
         Assert.AreEqual<int>(1, called);
         Assert.IsTrue(dataLayerFixcure.StartCalled);
+        Assert.IsTrue(SpinWait.SpinUntil(() => Volatile.Read(ref dataLayerFixcure.MoveCallCount) > 0, TimeSpan.FromSeconds(1)));
         Assert.AreEqual<int>(numberOfBalls2Create, dataLayerFixcure.NumberOfBallseCreated);
       }
     }
@@ -68,6 +69,11 @@ namespace TP.ConcurrentProgramming.BusinessLogic.Test
       { }
 
       public override void Start(int numberOfBalls, Action<IVector, Data.IBall> upperLayerHandler)
+      {
+        throw new NotImplementedException();
+      }
+
+      public override void Move()
       {
         throw new NotImplementedException();
       }
@@ -86,11 +92,17 @@ namespace TP.ConcurrentProgramming.BusinessLogic.Test
       {
         throw new NotImplementedException();
       }
+
+      public override void Move()
+      {
+        throw new NotImplementedException();
+      }
     }
 
     private class DataLayerStartFixcure : Data.DataAbstractAPI
     {
       internal bool StartCalled = false;
+      internal int MoveCallCount = 0;
       internal int NumberOfBallseCreated = -1;
 
       public override void Dispose()
@@ -101,6 +113,11 @@ namespace TP.ConcurrentProgramming.BusinessLogic.Test
         StartCalled = true;
         NumberOfBallseCreated = numberOfBalls;
         upperLayerHandler(new DataVectorFixture(), new DataBallFixture());
+      }
+
+      public override void Move()
+      {
+        Interlocked.Increment(ref MoveCallCount);
       }
 
       private record DataVectorFixture : Data.IVector

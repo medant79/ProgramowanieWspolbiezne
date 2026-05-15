@@ -65,5 +65,29 @@ namespace TP.ConcurrentProgramming.Data.Test
         newInstance.CheckNumberOfBalls(x => Assert.AreEqual<int>(10, x));
       }
     }
+
+    [TestMethod]
+    public void MoveTestMethod()
+    {
+      using (DataImplementation newInstance = new DataImplementation())
+      {
+        int numberOfCallbackInvoked = 0;
+        newInstance.Start(
+          1,
+          (startingPosition, ball) =>
+          {
+            ball.NewPositionNotification += (sender, position) =>
+            {
+              Assert.IsNotNull(sender);
+              Assert.IsNotNull(position);
+              numberOfCallbackInvoked++;
+            };
+          });
+
+        newInstance.Move();
+
+        Assert.AreEqual<int>(1, numberOfCallbackInvoked);
+      }
+    }
   }
 }
