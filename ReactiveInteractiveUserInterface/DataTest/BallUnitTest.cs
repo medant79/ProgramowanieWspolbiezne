@@ -17,20 +17,81 @@ namespace TP.ConcurrentProgramming.Data.Test
     public void ConstructorTestMethod()
     {
       Vector testinVector = new Vector(0.0, 0.0);
-      Ball newInstance = new(testinVector, testinVector);
+      Ball newInstance = new(testinVector, testinVector, mass: 1.0, diameter: 20.0);
     }
 
     [TestMethod]
     public void MoveTestMethod()
     {
       Vector initialPosition = new(10.0, 10.0);
-      Ball newInstance = new(initialPosition, new Vector(0.0, 0.0));
+      Ball newInstance = new(initialPosition, new Vector(0.0, 0.0), mass: 1.0, diameter: 20.0);
       IVector curentPosition = new Vector(0.0, 0.0);
       int numberOfCallBackCalled = 0;
       newInstance.NewPositionNotification += (sender, position) => { Assert.IsNotNull(sender); curentPosition = position; numberOfCallBackCalled++; };
       newInstance.Move(400.0, 420.0, 20.0);
       Assert.AreEqual<int>(1, numberOfCallBackCalled);
       Assert.AreEqual<IVector>(initialPosition, curentPosition);
+    }
+
+    [TestMethod]
+    public void MassPropertyTestMethod()
+    {
+      Vector testinVector = new Vector(0.0, 0.0);
+      double expectedMass = 1.0;
+      Ball newInstance = new(testinVector, testinVector, mass: expectedMass, diameter: 20.0);
+      Assert.AreEqual<double>(expectedMass, newInstance.Mass);
+    }
+
+    [TestMethod]
+    public void DiameterPropertyTestMethod()
+    {
+      Vector testinVector = new Vector(0.0, 0.0);
+      double expectedDiameter = 20.0;
+      Ball newInstance = new(testinVector, testinVector, mass: 1.0, diameter: expectedDiameter);
+      Assert.AreEqual<double>(expectedDiameter, newInstance.Diameter);
+    }
+
+    [TestMethod]
+    public void CurrentPositionTestMethod()
+    {
+      Vector initialPosition = new(10.0, 15.0);
+      Ball newInstance = new(initialPosition, new Vector(0.0, 0.0), mass: 1.0, diameter: 20.0);
+      IVector position = newInstance.CurrentPosition;
+      Assert.AreEqual<double>(10.0, position.x);
+      Assert.AreEqual<double>(15.0, position.y);
+    }
+
+    [TestMethod]
+    public void ThreadSafetyVelocityTestMethod()
+    {
+      Vector initialPosition = new(50.0, 50.0);
+      Vector initialVelocity = new(5.0, 5.0);
+      Ball newInstance = new(initialPosition, initialVelocity, mass: 1.0, diameter: 20.0);
+      
+      int readCount = 0;
+      int writeCount = 0;
+
+      Task readTask = Task.Run(() =>
+      {
+        for (int i = 0; i < 100; i++)
+        {
+          _ = newInstance.Velocity;
+          readCount++;
+        }
+      });
+
+      Task writeTask = Task.Run(() =>
+      {
+        for (int i = 0; i < 100; i++)
+        {
+          newInstance.Velocity = new Vector(i * 0.1, i * 0.1);
+          writeCount++;
+        }
+      });
+
+      Task.WaitAll(readTask, writeTask);
+      Assert.AreEqual<int>(100, readCount);
+      Assert.AreEqual<int>(100, writeCount);
     }
   }
 }

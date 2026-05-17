@@ -28,7 +28,7 @@ namespace TP.ConcurrentProgramming.Data
       {
         Vector startingPosition = new(RandomGenerator.Next((int)_ballDiameter, (int)(_boardWidth - _ballDiameter)), RandomGenerator.Next((int)_ballDiameter, (int)(_boardHeight - _ballDiameter)));
         Vector initialVelocity = new((RandomGenerator.NextDouble() - 0.5) * 10, (RandomGenerator.NextDouble() - 0.5) * 10);
-        Ball newBall = new(startingPosition, initialVelocity);
+        Ball newBall = new(startingPosition, initialVelocity, _ballMass, _ballDiameter);
         upperLayerHandler(startingPosition, newBall);
         BallsList.Add(newBall);
       }
@@ -78,6 +78,7 @@ namespace TP.ConcurrentProgramming.Data
     private readonly double _boardWidth = 400.0;
     private readonly double _boardHeight = 420.0;
     private readonly double _ballDiameter = 20.0;
+    private readonly double _ballMass = 1.0;
 
     #endregion private
 

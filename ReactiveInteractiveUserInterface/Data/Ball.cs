@@ -14,10 +14,12 @@ namespace TP.ConcurrentProgramming.Data
   {
     #region ctor
 
-    internal Ball(Vector initialPosition, Vector initialVelocity)
+    internal Ball(Vector initialPosition, Vector initialVelocity, double mass, double diameter)
     {
       Position = initialPosition;
       Velocity = initialVelocity;
+      _mass = mass;
+      _diameter = diameter;
     }
 
     #endregion ctor
@@ -28,46 +30,80 @@ namespace TP.ConcurrentProgramming.Data
 
     public IVector Velocity { get; set; }
 
+    public double Mass 
+    { 
+      get 
+      { 
+        lock (_lock) 
+          return _mass; 
+      } 
+    }
+
+    public double Diameter 
+    { 
+      get 
+      { 
+        lock (_lock) 
+          return _diameter; 
+      } 
+    }
+
+    public IVector CurrentPosition
+    {
+      get
+      {
+        lock (_lock)
+          return Position;
+      }
+    }
+
     #endregion IBall
 
     #region private
 
     private Vector Position;
+    private double _mass;
+    private double _diameter;
+    private readonly object _lock = new();
 
     private void RaiseNewPositionChangeNotification()
     {
-      NewPositionNotification?.Invoke(this, Position);
+      lock (_lock)
+        NewPositionNotification?.Invoke(this, Position);
     }
 
     internal void Move(double boardWidth, double boardHeight, double ballDiameter)
     {
-      double nextX = Position.x + Velocity.x;
-      double nextY = Position.y + Velocity.y;
+      lock (_lock)
+      {
+        double nextX = Position.x + Velocity.x;
+        double nextY = Position.y + Velocity.y;
 
-      if (nextX < 0)
-      {
-        nextX = 0;
-        Velocity = new Vector(-Velocity.x, Velocity.y);
-      }
-      else if (nextX > boardWidth - ballDiameter)
-      {
-        nextX = boardWidth - ballDiameter;
-        Velocity = new Vector(-Velocity.x, Velocity.y);
-      }
+        if (nextX < 0)
+        {
+          nextX = 0;
+          Velocity = new Vector(-Velocity.x, Velocity.y);
+        }
+        else if (nextX > boardWidth - ballDiameter)
+        {
+          nextX = boardWidth - ballDiameter;
+          Velocity = new Vector(-Velocity.x, Velocity.y);
+        }
 
-      if (nextY < 0)
-      {
-        nextY = 0;
-        Velocity = new Vector(Velocity.x, -Velocity.y);
-      }
-      else if (nextY > boardHeight - ballDiameter)
-      {
-        nextY = boardHeight - ballDiameter;
-        Velocity = new Vector(Velocity.x, -Velocity.y);
-      }
+        if (nextY < 0)
+        {
+          nextY = 0;
+          Velocity = new Vector(Velocity.x, -Velocity.y);
+        }
+        else if (nextY > boardHeight - ballDiameter)
+        {
+          nextY = boardHeight - ballDiameter;
+          Velocity = new Vector(Velocity.x, -Velocity.y);
+        }
 
-      Position = new Vector(nextX, nextY);
-      RaiseNewPositionChangeNotification();
+        Position = new Vector(nextX, nextY);
+        RaiseNewPositionChangeNotification();
+      }
     }
 
     #endregion private

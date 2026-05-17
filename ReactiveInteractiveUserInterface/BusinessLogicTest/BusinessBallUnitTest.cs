@@ -30,6 +30,12 @@ namespace TP.ConcurrentProgramming.BusinessLogic.Test
     {
       public Data.IVector Velocity { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
+      public double Mass => 1.0;
+
+      public double Diameter => 20.0;
+
+      public Data.IVector CurrentPosition => new VectorFixture(0.0, 0.0);
+
       public event EventHandler<Data.IVector>? NewPositionNotification;
 
       internal void Move()
