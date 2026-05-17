@@ -10,16 +10,16 @@
 
 namespace TP.ConcurrentProgramming.Data
 {
-  internal class Ball : IBall
-  {
+    internal class Ball : IBall
+    {
     #region ctor
 
     internal Ball(Vector initialPosition, Vector initialVelocity, double mass, double diameter)
     {
-      Position = initialPosition;
-      Velocity = initialVelocity;
-      _mass = mass;
-      _diameter = diameter;
+        Position = initialPosition;
+        Velocity = initialVelocity;
+        _mass = mass;
+        _diameter = diameter;
     }
 
     #endregion ctor
@@ -28,33 +28,45 @@ namespace TP.ConcurrentProgramming.Data
 
     public event EventHandler<IVector>? NewPositionNotification;
 
-    public IVector Velocity { get; set; }
+    public IVector Velocity
+    {
+        get
+        {
+            lock (_lock)
+                return _velocity;
+        }
+        set
+        {
+            lock (_lock)
+                _velocity = value;
+        }
+    }
 
     public double Mass 
     { 
-      get 
-      { 
+        get 
+        { 
         lock (_lock) 
-          return _mass; 
-      } 
+            return _mass; 
+        } 
     }
 
     public double Diameter 
     { 
-      get 
-      { 
+        get 
+        { 
         lock (_lock) 
-          return _diameter; 
-      } 
+            return _diameter; 
+        } 
     }
 
     public IVector CurrentPosition
     {
-      get
-      {
+        get
+        {
         lock (_lock)
-          return Position;
-      }
+            return Position;
+        }
     }
 
     #endregion IBall
@@ -62,50 +74,48 @@ namespace TP.ConcurrentProgramming.Data
     #region private
 
     private Vector Position;
-    private double _mass;
-    private double _diameter;
+    private IVector _velocity = new Vector(0.0, 0.0);
+    private readonly double _mass;
+    private readonly double _diameter;
     private readonly object _lock = new();
-
-    private void RaiseNewPositionChangeNotification()
-    {
-      lock (_lock)
-        NewPositionNotification?.Invoke(this, Position);
-    }
 
     internal void Move(double boardWidth, double boardHeight, double ballDiameter)
     {
-      lock (_lock)
-      {
-        double nextX = Position.x + Velocity.x;
-        double nextY = Position.y + Velocity.y;
+        IVector newPosition;
 
-        if (nextX < 0)
+        lock (_lock)
         {
-          nextX = 0;
-          Velocity = new Vector(-Velocity.x, Velocity.y);
-        }
-        else if (nextX > boardWidth - ballDiameter)
-        {
-          nextX = boardWidth - ballDiameter;
-          Velocity = new Vector(-Velocity.x, Velocity.y);
+            double nextX = Position.x + _velocity.x;
+            double nextY = Position.y + _velocity.y;
+
+            if (nextX < 0)
+            {
+                nextX = 0;
+                _velocity = new Vector(-_velocity.x, _velocity.y);
+            }
+            else if (nextX > boardWidth - ballDiameter)
+            {
+                nextX = boardWidth - ballDiameter;
+                _velocity = new Vector(-_velocity.x, _velocity.y);
+            }
+
+            if (nextY < 0)
+            {
+                nextY = 0;
+                _velocity = new Vector(_velocity.x, -_velocity.y);
+            }
+            else if (nextY > boardHeight - ballDiameter)
+            {
+                nextY = boardHeight - ballDiameter;
+                _velocity = new Vector(_velocity.x, -_velocity.y);
+            }
+
+            Position = new Vector(nextX, nextY);
+            newPosition = Position;
         }
 
-        if (nextY < 0)
-        {
-          nextY = 0;
-          Velocity = new Vector(Velocity.x, -Velocity.y);
-        }
-        else if (nextY > boardHeight - ballDiameter)
-        {
-          nextY = boardHeight - ballDiameter;
-          Velocity = new Vector(Velocity.x, -Velocity.y);
-        }
-
-        Position = new Vector(nextX, nextY);
-        RaiseNewPositionChangeNotification();
-      }
+        NewPositionNotification?.Invoke(this, newPosition);
     }
-
     #endregion private
-  }
+    }
 }

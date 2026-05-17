@@ -13,33 +13,50 @@ using System.Diagnostics;
 
 namespace TP.ConcurrentProgramming.Data
 {
-  internal class DataImplementation : DataAbstractAPI
-  {
+    internal class DataImplementation : DataAbstractAPI
+    {
     #region DataAbstractAPI
 
     public override void Start(int numberOfBalls, Action<IVector, IBall> upperLayerHandler)
     {
-      if (Disposed)
-        throw new ObjectDisposedException(nameof(DataImplementation));
-      if (upperLayerHandler == null)
-        throw new ArgumentNullException(nameof(upperLayerHandler));
-      BallsList.Clear();
-      for (int i = 0; i < numberOfBalls; i++)
-      {
-        Vector startingPosition = new(RandomGenerator.Next((int)_ballDiameter, (int)(_boardWidth - _ballDiameter)), RandomGenerator.Next((int)_ballDiameter, (int)(_boardHeight - _ballDiameter)));
-        Vector initialVelocity = new((RandomGenerator.NextDouble() - 0.5) * 10, (RandomGenerator.NextDouble() - 0.5) * 10);
-        Ball newBall = new(startingPosition, initialVelocity, _ballMass, _ballDiameter);
-        upperLayerHandler(startingPosition, newBall);
-        BallsList.Add(newBall);
-      }
+        if (Disposed)
+            throw new ObjectDisposedException(nameof(DataImplementation));
+
+        if (upperLayerHandler == null)
+            throw new ArgumentNullException(nameof(upperLayerHandler));
+
+        lock (BallsListLock)
+        {
+            BallsList.Clear();
+
+            for (int i = 0; i < numberOfBalls; i++)
+            {
+                Vector startingPosition = new(
+                    RandomGenerator.Next((int)_ballDiameter, (int)(_boardWidth - _ballDiameter)),
+                    RandomGenerator.Next((int)_ballDiameter, (int)(_boardHeight - _ballDiameter)));
+
+                Vector initialVelocity = new(
+                    (RandomGenerator.NextDouble() - 0.5) * 10,
+                    (RandomGenerator.NextDouble() - 0.5) * 10);
+
+                Ball newBall = new(startingPosition, initialVelocity, _ballMass, _ballDiameter);
+
+                BallsList.Add(newBall);
+                upperLayerHandler(startingPosition, newBall);
+            }
+        }
     }
 
     public override void Move()
     {
-      if (Disposed)
-        throw new ObjectDisposedException(nameof(DataImplementation));
-      foreach (Ball item in BallsList)
-        item.Move(_boardWidth, _boardHeight, _ballDiameter);
+        if (Disposed)
+            throw new ObjectDisposedException(nameof(DataImplementation));
+
+        lock (BallsListLock)
+        {
+            foreach (Ball item in BallsList)
+                item.Move(_boardWidth, _boardHeight, _ballDiameter);
+        }
     }
 
     #endregion DataAbstractAPI
@@ -48,22 +65,25 @@ namespace TP.ConcurrentProgramming.Data
 
     protected virtual void Dispose(bool disposing)
     {
-      if (!Disposed)
-      {
-        if (disposing)
+        if (!Disposed)
         {
-          BallsList.Clear();
+            if (disposing)
+            {
+                lock (BallsListLock)
+                {
+                    BallsList.Clear();
+                }
+            }
+            Disposed = true;
         }
-        Disposed = true;
-      }
-      else
-        throw new ObjectDisposedException(nameof(DataImplementation));
+        else
+            throw new ObjectDisposedException(nameof(DataImplementation));
     }
 
     public override void Dispose()
     {
-      Dispose(disposing: true);
-      GC.SuppressFinalize(this);
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 
     #endregion IDisposable
@@ -71,6 +91,8 @@ namespace TP.ConcurrentProgramming.Data
     #region private
 
     private bool Disposed = false;
+
+    private readonly object BallsListLock = new();
 
     private Random RandomGenerator = new();
     private List<Ball> BallsList = [];
@@ -87,21 +109,27 @@ namespace TP.ConcurrentProgramming.Data
     [Conditional("DEBUG")]
     internal void CheckBallsList(Action<IEnumerable<IBall>> returnBallsList)
     {
-      returnBallsList(BallsList);
+        lock (BallsListLock)
+        {
+            returnBallsList(BallsList);
+        }
     }
 
     [Conditional("DEBUG")]
     internal void CheckNumberOfBalls(Action<int> returnNumberOfBalls)
     {
-      returnNumberOfBalls(BallsList.Count);
+        lock (BallsListLock)
+        {
+            returnNumberOfBalls(BallsList.Count);
+        }
     }
 
     [Conditional("DEBUG")]
     internal void CheckObjectDisposed(Action<bool> returnInstanceDisposed)
     {
-      returnInstanceDisposed(Disposed);
+        returnInstanceDisposed(Disposed);
     }
 
     #endregion TestingInfrastructure
-  }
+    }
 }
