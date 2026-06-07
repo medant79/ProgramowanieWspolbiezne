@@ -15,120 +15,141 @@ namespace TP.ConcurrentProgramming.Data
 {
     internal class DataImplementation : DataAbstractAPI
     {
-    #region DataAbstractAPI
+        #region ctor
 
-    public override void Start(int numberOfBalls, Action<IVector, IBall> upperLayerHandler)
-    {
-        if (Disposed)
-            throw new ObjectDisposedException(nameof(DataImplementation));
-
-        if (upperLayerHandler == null)
-            throw new ArgumentNullException(nameof(upperLayerHandler));
-
-        lock (BallsListLock)
+        public DataImplementation() : this(null)
         {
-            BallsList.Clear();
-
-            for (int i = 0; i < numberOfBalls; i++)
-            {
-                Vector startingPosition = new(
-                    RandomGenerator.Next((int)_ballDiameter, (int)(_boardWidth - _ballDiameter)),
-                    RandomGenerator.Next((int)_ballDiameter, (int)(_boardHeight - _ballDiameter)));
-
-                Vector initialVelocity = new(
-                    (RandomGenerator.NextDouble() - 0.5) * 10,
-                    (RandomGenerator.NextDouble() - 0.5) * 10);
-
-                Ball newBall = new(startingPosition, initialVelocity, _ballMass, _ballDiameter);
-
-                BallsList.Add(newBall);
-                upperLayerHandler(startingPosition, newBall);
-            }
         }
-    }
 
-    public override void Move()
-    {
-        if (Disposed)
-            throw new ObjectDisposedException(nameof(DataImplementation));
-
-        lock (BallsListLock)
+        internal DataImplementation(IDiagnosticLogger? diagnosticLogger)
         {
-            foreach (Ball item in BallsList)
-                item.Move(_boardWidth, _boardHeight, _ballDiameter);
+            DiagnosticLogger = diagnosticLogger ?? new DiagnosticLogger();
         }
-    }
 
-    #endregion DataAbstractAPI
+        #endregion ctor
 
-    #region IDisposable
+        #region DataAbstractAPI
 
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!Disposed)
+        public override void Start(int numberOfBalls, Action<IVector, IBall> upperLayerHandler)
         {
-            if (disposing)
+            if (Disposed)
+                throw new ObjectDisposedException(nameof(DataImplementation));
+
+            if (upperLayerHandler == null)
+                throw new ArgumentNullException(nameof(upperLayerHandler));
+
+            lock (BallsListLock)
             {
-                lock (BallsListLock)
+                BallsList.Clear();
+
+                for (int i = 0; i < numberOfBalls; i++)
                 {
-                    BallsList.Clear();
+                    Vector startingPosition = new(
+                        RandomGenerator.Next((int)_ballDiameter, (int)(_boardWidth - _ballDiameter)),
+                        RandomGenerator.Next((int)_ballDiameter, (int)(_boardHeight - _ballDiameter))
+                    );
+
+                    Vector initialVelocity = new(
+                        (RandomGenerator.NextDouble() - 0.5) * _maxInitialSpeed,
+                        (RandomGenerator.NextDouble() - 0.5) * _maxInitialSpeed
+                    );
+
+                    Ball newBall = new(startingPosition, initialVelocity, _ballMass, _ballDiameter, i, DiagnosticLogger);
+
+                    BallsList.Add(newBall);
+                    upperLayerHandler(startingPosition, newBall);
                 }
             }
-            Disposed = true;
         }
-        else
-            throw new ObjectDisposedException(nameof(DataImplementation));
-    }
 
-    public override void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
-
-    #endregion IDisposable
-
-    #region private
-
-    private bool Disposed = false;
-
-    private readonly object BallsListLock = new();
-
-    private Random RandomGenerator = new();
-    private List<Ball> BallsList = [];
-
-    private readonly double _boardWidth = 400.0;
-    private readonly double _boardHeight = 420.0;
-    private readonly double _ballDiameter = 20.0;
-    private readonly double _ballMass = 1.0;
-
-    #endregion private
-
-    #region TestingInfrastructure
-
-    [Conditional("DEBUG")]
-    internal void CheckBallsList(Action<IEnumerable<IBall>> returnBallsList)
-    {
-        lock (BallsListLock)
+        public override void Move(double deltaTime)
         {
-            returnBallsList(BallsList);
-        }
-    }
+            if (Disposed)
+                throw new ObjectDisposedException(nameof(DataImplementation));
 
-    [Conditional("DEBUG")]
-    internal void CheckNumberOfBalls(Action<int> returnNumberOfBalls)
-    {
-        lock (BallsListLock)
+            lock (BallsListLock)
+            {
+                foreach (Ball item in BallsList)
+                    item.Move(_boardWidth, _boardHeight, _ballDiameter, deltaTime);
+            }
+        }
+
+        #endregion DataAbstractAPI
+
+        #region IDisposable
+
+        protected virtual void Dispose(bool disposing)
         {
-            returnNumberOfBalls(BallsList.Count);
-        }
-    }
+            if (!Disposed)
+            {
+                if (disposing)
+                {
+                    lock (BallsListLock)
+                    {
+                        BallsList.Clear();
+                    }
 
-    [Conditional("DEBUG")]
-    internal void CheckObjectDisposed(Action<bool> returnInstanceDisposed)
-    {
-        returnInstanceDisposed(Disposed);
-    }
+                    DiagnosticLogger.Dispose();
+                }
+                Disposed = true;
+            }
+            else
+                throw new ObjectDisposedException(nameof(DataImplementation));
+        }
+
+        public override void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        #endregion IDisposable
+
+        #region private
+
+        private bool Disposed = false;
+
+        private readonly object BallsListLock = new();
+
+        private Random RandomGenerator = new();
+        private List<Ball> BallsList = [];
+
+        private readonly double _boardWidth = 400.0;
+        private readonly double _boardHeight = 420.0;
+        private readonly double _ballDiameter = 20.0;
+        private readonly double _ballMass = 1.0;
+
+        private readonly double _maxInitialSpeed = 300.0;
+
+        private readonly IDiagnosticLogger DiagnosticLogger;
+
+        #endregion private
+
+        #region TestingInfrastructure
+
+        [Conditional("DEBUG")]
+        internal void CheckBallsList(Action<IEnumerable<IBall>> returnBallsList)
+        {
+            lock (BallsListLock)
+            {
+                returnBallsList(BallsList);
+            }
+        }
+
+        [Conditional("DEBUG")]
+        internal void CheckNumberOfBalls(Action<int> returnNumberOfBalls)
+        {
+            lock (BallsListLock)
+            {
+                returnNumberOfBalls(BallsList.Count);
+            }
+        }
+
+        [Conditional("DEBUG")]
+        internal void CheckObjectDisposed(Action<bool> returnInstanceDisposed)
+        {
+            returnInstanceDisposed(Disposed);
+        }
 
     #endregion TestingInfrastructure
     }

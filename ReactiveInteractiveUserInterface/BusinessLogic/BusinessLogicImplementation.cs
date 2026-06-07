@@ -15,129 +15,139 @@ namespace TP.ConcurrentProgramming.BusinessLogic
 {
     internal class BusinessLogicImplementation : BusinessLogicAbstractAPI
     {
-    #region ctor
+        #region ctor
 
-    public BusinessLogicImplementation() : this(null)
-    { }
+        public BusinessLogicImplementation() : this(null)
+        { }
 
-    internal BusinessLogicImplementation(UnderneathLayerAPI? underneathLayer)
-    {
-        layerBellow = underneathLayer == null ? UnderneathLayerAPI.GetDataLayer() : underneathLayer;
-        MoveTimer = new Timer(Move, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-    }
+        internal BusinessLogicImplementation(UnderneathLayerAPI? underneathLayer)
+        {
+            layerBellow = underneathLayer == null ? UnderneathLayerAPI.GetDataLayer() : underneathLayer;
+            MoveTimer = new Timer(Move, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        }
 
-    #endregion ctor
+        #endregion ctor
 
-    #region BusinessLogicAbstractAPI
+        #region BusinessLogicAbstractAPI
 
-    public override void Dispose()
-    {
-        if (Disposed)
-            throw new ObjectDisposedException(nameof(BusinessLogicImplementation));
+        public override void Dispose()
+        {
+            if (Disposed)
+                throw new ObjectDisposedException(nameof(BusinessLogicImplementation));
 
-        MoveTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        MoveTimer.Dispose();
+            MoveTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            MoveTimer.Dispose();
 
-        layerBellow.Dispose();
-        Disposed = true;
+            layerBellow.Dispose();
+            Disposed = true;
 
-    }
+        }
 
         public override void Start(int numberOfBalls, Action<IPosition, IBall> upperLayerHandler)
-    {
-        if (Disposed)
-            throw new ObjectDisposedException(nameof(BusinessLogicImplementation));
+        {
+            if (Disposed)
+                throw new ObjectDisposedException(nameof(BusinessLogicImplementation));
 
-        if (upperLayerHandler == null)
-            throw new ArgumentNullException(nameof(upperLayerHandler));
+            if (upperLayerHandler == null)
+                throw new ArgumentNullException(nameof(upperLayerHandler));
 
-        MoveTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            MoveTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
       
-        lock(DataBallsLock)
-        {
-            DataBalls.Clear();
-        }
-
-        layerBellow.Start(numberOfBalls, (startingPosition, databall) =>
-        {
-            lock (DataBallsLock)
+            lock(DataBallsLock)
             {
-                DataBalls.Add(databall);
+                DataBalls.Clear();
             }
 
-            upperLayerHandler(
-                new Position(startingPosition.x, startingPosition.y),
-                new Ball(databall)
-            );
-        });
-
-        MoveTimer.Change(TimeSpan.Zero, TimeSpan.FromMilliseconds(16));
-    }
-
-    #endregion BusinessLogicAbstractAPI
-
-    #region private
-
-    private bool Disposed = false;
-    private int MoveInProgress = 0;
-
-    private readonly UnderneathLayerAPI layerBellow;
-    private readonly Timer MoveTimer;
-
-    private readonly List<Data.IBall> DataBalls = new();
-    private readonly object DataBallsLock = new();
-    
-    private void Move(object? state)
-    {
-        if (Disposed)
-            return;
-
-        if (Interlocked.Exchange(ref MoveInProgress, 1) == 1)
-            return;
-
-        try
-        {
-            layerBellow.Move();
-
-            lock (DataBallsLock)
+            layerBellow.Start(numberOfBalls, (startingPosition, databall) =>
             {
-                ResolveCollisions();
-            }
-        }
-        finally
-        {
-            Interlocked.Exchange(ref MoveInProgress, 0);
-        }
-
-    }
-
-    private void ResolveCollisions()
-    {
-        for (int i = 0; i < DataBalls.Count; i++)
-        {
-            for (int j = i + 1; j < DataBalls.Count; j++)
-            {
-                Data.IBall FirstBall = DataBalls[i];
-                Data.IBall SecondBall = DataBalls[j];
-
-                if(CollisionService.AreColliding(FirstBall, SecondBall))
+                lock (DataBallsLock)
                 {
-                    CollisionService.ResolveElasticCollision(FirstBall, SecondBall);
+                    DataBalls.Add(databall);
+                }
+
+                upperLayerHandler(
+                    new Position(startingPosition.x, startingPosition.y),
+                    new Ball(databall)
+                );
+            });
+
+            SimulationStopwatch.Restart();
+            LastMoveTimestamp = SimulationStopwatch.ElapsedTicks;
+
+            MoveTimer.Change(TimeSpan.Zero, TimeSpan.FromMilliseconds(16));
+        }
+
+        #endregion BusinessLogicAbstractAPI
+
+        #region private
+
+        private bool Disposed = false;
+        private int MoveInProgress = 0;
+
+        private readonly Stopwatch SimulationStopwatch = new();
+        private long LastMoveTimestamp = 0;
+
+        private readonly UnderneathLayerAPI layerBellow;
+        private readonly Timer MoveTimer;
+
+        private readonly List<Data.IBall> DataBalls = new();
+        private readonly object DataBallsLock = new();
+    
+        private void Move(object? state)
+        {
+            if (Disposed)
+                return;
+
+            if (Interlocked.Exchange(ref MoveInProgress, 1) == 1)
+                return;
+
+            try
+            {
+                long nowTimestamp = SimulationStopwatch.ElapsedTicks;
+                double deltaTime = (nowTimestamp - LastMoveTimestamp) / (double)Stopwatch.Frequency;
+                LastMoveTimestamp = nowTimestamp;
+
+                layerBellow.Move(deltaTime);
+
+                lock (DataBallsLock)
+                {
+                    ResolveCollisions();
+                }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref MoveInProgress, 0);
+            }
+
+        }
+
+        private void ResolveCollisions()
+        {
+            for (int i = 0; i < DataBalls.Count; i++)
+            {
+                for (int j = i + 1; j < DataBalls.Count; j++)
+                {
+                    Data.IBall FirstBall = DataBalls[i];
+                    Data.IBall SecondBall = DataBalls[j];
+
+                    if(CollisionService.AreColliding(FirstBall, SecondBall))
+                    {
+                        CollisionService.ResolveElasticCollision(FirstBall, SecondBall);
+                    }
                 }
             }
         }
-    }
 
-    #endregion private
+        #endregion private
 
-    #region TestingInfrastructure
+        #region TestingInfrastructure
 
-    [Conditional("DEBUG")]
-    internal void CheckObjectDisposed(Action<bool> returnInstanceDisposed)
-    {
-        returnInstanceDisposed(Disposed);
-    }
+        [Conditional("DEBUG")]
+        internal void CheckObjectDisposed(Action<bool> returnInstanceDisposed)
+        {
+            returnInstanceDisposed(Disposed);
+        }
 
-    #endregion TestingInfrastructure
+        #endregion TestingInfrastructure
     }
 }

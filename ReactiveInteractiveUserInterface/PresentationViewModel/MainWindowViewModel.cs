@@ -59,23 +59,23 @@ namespace TP.ConcurrentProgramming.Presentation.ViewModel
     private string _ballCount = "";
     public string BallCount
     {
-      get => _ballCount;
-      set
-      {
-        if (_ballCount == value) return;
-        _ballCount = value;
-        RaisePropertyChanged(nameof(BallCount));
-      }
+        get => _ballCount;
+        set
+        {
+            if (_ballCount == value) return;
+            _ballCount = value;
+            RaisePropertyChanged(nameof(BallCount));
+        }
     }
 
     public System.Windows.Input.ICommand StartCommand { get; }
 
     public void Start(int numberOfBalls)
     {
-      if (Disposed)
-        throw new ObjectDisposedException(nameof(MainWindowViewModel));
-      Balls.Clear();
-      ModelLayer.Start(numberOfBalls);
+        if (Disposed)
+            throw new ObjectDisposedException(nameof(MainWindowViewModel));
+        Balls.Clear();
+        ModelLayer.Start(numberOfBalls);
     }
 
     public ObservableCollection<ModelIBall> Balls { get; } = new ObservableCollection<ModelIBall>();
@@ -86,27 +86,27 @@ namespace TP.ConcurrentProgramming.Presentation.ViewModel
 
     protected virtual void Dispose(bool disposing)
     {
-      if (!Disposed)
-      {
-        if (disposing)
+        if (!Disposed)
         {
-          Balls.Clear();
-          Observer.Dispose();
-          ModelLayer.Dispose();
-        }
+            if (disposing)
+            {
+                Balls.Clear();
+                Observer.Dispose();
+                ModelLayer.Dispose();
+            }
 
         // TODO: free unmanaged resources (unmanaged objects) and override finalizer
         // TODO: set large fields to null
-        Disposed = true;
-      }
+            Disposed = true;
+        }
     }
 
     public void Dispose()
     {
-      if (Disposed)
-        throw new ObjectDisposedException(nameof(MainWindowViewModel));
-      Dispose(disposing: true);
-      GC.SuppressFinalize(this);
+        if (Disposed)
+            throw new ObjectDisposedException(nameof(MainWindowViewModel));
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 
     #endregion IDisposable
