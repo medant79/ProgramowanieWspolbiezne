@@ -14,7 +14,14 @@ namespace TP.ConcurrentProgramming.Data
     {
         #region ctor
 
-        internal Ball(Vector initialPosition, Vector initialVelocity, double mass, double diameter, int ballId, IDiagnosticLogger? diagnosticLogger)
+        internal Ball(
+            Vector initialPosition,
+            Vector initialVelocity,
+            double mass,
+            double diameter,
+            int ballId,
+            IDiagnosticLogger? diagnosticLogger,
+            TimeProvider? timeProvider = null)
         {
             Position = initialPosition;
             Velocity = initialVelocity;
@@ -22,6 +29,7 @@ namespace TP.ConcurrentProgramming.Data
             _diameter = diameter;
             _ballId = ballId;
             _diagnosticLogger = diagnosticLogger;
+            _timeProvider = timeProvider ?? TimeProvider.System;
         }
 
         #endregion ctor
@@ -82,6 +90,7 @@ namespace TP.ConcurrentProgramming.Data
         private readonly object _lock = new();
         private readonly int _ballId;
         private readonly IDiagnosticLogger? _diagnosticLogger;
+        private readonly TimeProvider _timeProvider;
 
         internal void Move(double boardWidth, double boardHeight, double ballDiameter, double deltaTime)
         {

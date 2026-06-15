@@ -17,13 +17,18 @@ namespace TP.ConcurrentProgramming.Data
     {
         #region ctor
 
-        public DataImplementation() : this(null)
+        public DataImplementation() : this(null, null)
         {
         }
 
-        internal DataImplementation(IDiagnosticLogger? diagnosticLogger)
+        internal DataImplementation(IDiagnosticLogger? diagnosticLogger) : this(diagnosticLogger, null)
+        {
+        }
+
+        internal DataImplementation(IDiagnosticLogger? diagnosticLogger, TimeProvider? timeProvider)
         {
             DiagnosticLogger = diagnosticLogger ?? new DiagnosticLogger();
+            TimeProvider = timeProvider ?? TimeProvider.System;
         }
 
         #endregion ctor
@@ -54,7 +59,7 @@ namespace TP.ConcurrentProgramming.Data
                         (RandomGenerator.NextDouble() - 0.5) * _maxInitialSpeed
                     );
 
-                    Ball newBall = new(startingPosition, initialVelocity, _ballMass, _ballDiameter, i, DiagnosticLogger);
+                    Ball newBall = new(startingPosition, initialVelocity, _ballMass, _ballDiameter, i, DiagnosticLogger, TimeProvider);
 
                     BallsList.Add(newBall);
                     upperLayerHandler(startingPosition, newBall);
@@ -113,6 +118,8 @@ namespace TP.ConcurrentProgramming.Data
 
         private Random RandomGenerator = new();
         private List<Ball> BallsList = [];
+
+        private readonly TimeProvider TimeProvider;
 
         private readonly double _boardWidth = 400.0;
         private readonly double _boardHeight = 420.0;

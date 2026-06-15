@@ -17,13 +17,22 @@ namespace TP.ConcurrentProgramming.BusinessLogic
     {
         #region ctor
 
-        public BusinessLogicImplementation() : this(null)
+        public BusinessLogicImplementation() : this(null, null)
         { }
 
-        internal BusinessLogicImplementation(UnderneathLayerAPI? underneathLayer)
+        internal BusinessLogicImplementation(UnderneathLayerAPI? underneathLayer) : this(underneathLayer, null)
+        { }
+
+        internal BusinessLogicImplementation(UnderneathLayerAPI? underneathLayer, TimeProvider? timeProvider)
         {
             layerBellow = underneathLayer == null ? UnderneathLayerAPI.GetDataLayer() : underneathLayer;
-            MoveTimer = new Timer(Move, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            TimeProvider = timeProvider ?? TimeProvider.System;
+
+            MoveTimer = TimeProvider.CreateTimer(
+                Move,
+                null,
+                Timeout.InfiniteTimeSpan,
+                Timeout.InfiniteTimeSpan);
         }
 
         #endregion ctor
@@ -71,10 +80,9 @@ namespace TP.ConcurrentProgramming.BusinessLogic
                 );
             });
 
-            SimulationStopwatch.Restart();
-            LastMoveTimestamp = SimulationStopwatch.ElapsedTicks;
+            LastMoveTimestamp = TimeProvider.GetTimestamp();
 
-            MoveTimer.Change(TimeSpan.Zero, TimeSpan.FromMilliseconds(16));
+            MoveTimer.Change(TimeSpan.Zero, FrameInterval);
         }
 
         #endregion BusinessLogicAbstractAPI
@@ -84,11 +92,12 @@ namespace TP.ConcurrentProgramming.BusinessLogic
         private bool Disposed = false;
         private int MoveInProgress = 0;
 
-        private readonly Stopwatch SimulationStopwatch = new();
+        private readonly TimeProvider TimeProvider;
+        private readonly ITimer MoveTimer;
         private long LastMoveTimestamp = 0;
+        private static readonly TimeSpan FrameInterval = TimeSpan.FromMilliseconds(16);
 
         private readonly UnderneathLayerAPI layerBellow;
-        private readonly Timer MoveTimer;
 
         private readonly List<Data.IBall> DataBalls = new();
         private readonly object DataBallsLock = new();
@@ -103,9 +112,11 @@ namespace TP.ConcurrentProgramming.BusinessLogic
 
             try
             {
-                long nowTimestamp = SimulationStopwatch.ElapsedTicks;
-                double deltaTime = (nowTimestamp - LastMoveTimestamp) / (double)Stopwatch.Frequency;
+                long nowTimestamp = TimeProvider.GetTimestamp();
+                TimeSpan elapsedTime = TimeProvider.GetElapsedTime(LastMoveTimestamp, nowTimestamp);
                 LastMoveTimestamp = nowTimestamp;
+
+                double deltaTime = elapsedTime.TotalSeconds;
 
                 layerBellow.Move(deltaTime);
 
