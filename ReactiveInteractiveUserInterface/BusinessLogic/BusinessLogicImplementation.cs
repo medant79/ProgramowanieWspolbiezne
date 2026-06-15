@@ -27,12 +27,6 @@ namespace TP.ConcurrentProgramming.BusinessLogic
         {
             layerBellow = underneathLayer == null ? UnderneathLayerAPI.GetDataLayer() : underneathLayer;
             TimeProvider = timeProvider ?? TimeProvider.System;
-
-            MoveTimer = TimeProvider.CreateTimer(
-                Move,
-                null,
-                Timeout.InfiniteTimeSpan,
-                Timeout.InfiniteTimeSpan);
         }
 
         #endregion ctor
@@ -41,48 +35,50 @@ namespace TP.ConcurrentProgramming.BusinessLogic
 
         public override void Dispose()
         {
-            if (Disposed)
-                throw new ObjectDisposedException(nameof(BusinessLogicImplementation));
+            lock (LifecycleLock)
+            {
+                if (Disposed)
+                    throw new ObjectDisposedException(nameof(BusinessLogicImplementation));
 
-            MoveTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-            MoveTimer.Dispose();
-
-            layerBellow.Dispose();
-            Disposed = true;
+                StopBallWorkers();
+                layerBellow.Dispose();
+                Disposed = true;
+            }
 
         }
 
         public override void Start(int numberOfBalls, Action<IPosition, IBall> upperLayerHandler)
         {
-            if (Disposed)
-                throw new ObjectDisposedException(nameof(BusinessLogicImplementation));
+            lock (LifecycleLock)
+            {
+                if (Disposed)
+                    throw new ObjectDisposedException(nameof(BusinessLogicImplementation));
 
-            if (upperLayerHandler == null)
-                throw new ArgumentNullException(nameof(upperLayerHandler));
+                if (upperLayerHandler == null)
+                    throw new ArgumentNullException(nameof(upperLayerHandler));
 
-            MoveTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                StopBallWorkers();
       
-            lock(DataBallsLock)
-            {
-                DataBalls.Clear();
-            }
-
-            layerBellow.Start(numberOfBalls, (startingPosition, databall) =>
-            {
-                lock (DataBallsLock)
+                lock(DataBallsLock)
                 {
-                    DataBalls.Add(databall);
+                    DataBalls.Clear();
                 }
 
-                upperLayerHandler(
-                    new Position(startingPosition.x, startingPosition.y),
-                    new Ball(databall)
-                );
-            });
+                layerBellow.Start(numberOfBalls, (startingPosition, databall) =>
+                {
+                    lock (DataBallsLock)
+                    {
+                        DataBalls.Add(databall);
+                    }
 
-            LastMoveTimestamp = TimeProvider.GetTimestamp();
+                    upperLayerHandler(
+                        new Position(startingPosition.x, startingPosition.y),
+                        new Ball(databall)
+                    );
+                });
 
-            MoveTimer.Change(TimeSpan.Zero, FrameInterval);
+                StartBallWorkers();
+            }
         }
 
         #endregion BusinessLogicAbstractAPI
@@ -90,61 +86,114 @@ namespace TP.ConcurrentProgramming.BusinessLogic
         #region private
 
         private bool Disposed = false;
-        private int MoveInProgress = 0;
 
         private readonly TimeProvider TimeProvider;
-        private readonly ITimer MoveTimer;
-        private long LastMoveTimestamp = 0;
         private static readonly TimeSpan FrameInterval = TimeSpan.FromMilliseconds(16);
 
         private readonly UnderneathLayerAPI layerBellow;
 
         private readonly List<Data.IBall> DataBalls = new();
         private readonly object DataBallsLock = new();
+        private readonly object LifecycleLock = new();
+        private readonly object BallWorkersLock = new();
+        private readonly List<Thread> BallWorkers = new();
+        private CancellationTokenSource? SimulationCancellationTokenSource = null;
     
-        private void Move(object? state)
+        private void StartBallWorkers()
         {
-            if (Disposed)
-                return;
+            Data.IBall[] ballsSnapshot;
 
-            if (Interlocked.Exchange(ref MoveInProgress, 1) == 1)
-                return;
-
-            try
+            lock (DataBallsLock)
             {
-                long nowTimestamp = TimeProvider.GetTimestamp();
-                TimeSpan elapsedTime = TimeProvider.GetElapsedTime(LastMoveTimestamp, nowTimestamp);
-                LastMoveTimestamp = nowTimestamp;
+                ballsSnapshot = DataBalls.ToArray();
+            }
 
-                double deltaTime = elapsedTime.TotalSeconds;
+            CancellationTokenSource cancellationTokenSource = new();
+            List<Thread> workers = [];
 
-                layerBellow.Move(deltaTime);
-
-                lock (DataBallsLock)
+            foreach (Data.IBall ball in ballsSnapshot)
+            {
+                Thread worker = new(() => MoveBall(ball, cancellationTokenSource.Token))
                 {
-                    ResolveCollisions();
-                }
-            }
-            finally
-            {
-                Interlocked.Exchange(ref MoveInProgress, 0);
+                    IsBackground = true,
+                    Name = "Ball worker"
+                };
+                worker.Start();
+                workers.Add(worker);
             }
 
+            lock (BallWorkersLock)
+            {
+                SimulationCancellationTokenSource = cancellationTokenSource;
+                BallWorkers.Clear();
+                BallWorkers.AddRange(workers);
+            }
         }
 
-        private void ResolveCollisions()
+        private void StopBallWorkers()
         {
-            for (int i = 0; i < DataBalls.Count; i++)
-            {
-                for (int j = i + 1; j < DataBalls.Count; j++)
-                {
-                    Data.IBall FirstBall = DataBalls[i];
-                    Data.IBall SecondBall = DataBalls[j];
+            CancellationTokenSource? cancellationTokenSource;
+            Thread[] workers;
 
-                    if(CollisionService.AreColliding(FirstBall, SecondBall))
+            lock (BallWorkersLock)
+            {
+                cancellationTokenSource = SimulationCancellationTokenSource;
+                workers = BallWorkers.ToArray();
+                SimulationCancellationTokenSource = null;
+                BallWorkers.Clear();
+            }
+
+            if (cancellationTokenSource == null)
+                return;
+
+            cancellationTokenSource.Cancel();
+
+            foreach (Thread worker in workers)
+                if (worker.IsAlive)
+                    worker.Join(TimeSpan.FromSeconds(2));
+
+            cancellationTokenSource.Dispose();
+        }
+
+        private void MoveBall(Data.IBall ball, CancellationToken cancellationToken)
+        {
+            long lastMoveTimestamp = TimeProvider.GetTimestamp();
+
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                if (cancellationToken.WaitHandle.WaitOne(FrameInterval))
+                    break;
+
+                long nowTimestamp = TimeProvider.GetTimestamp();
+                TimeSpan elapsedTime = TimeProvider.GetElapsedTime(lastMoveTimestamp, nowTimestamp);
+                lastMoveTimestamp = nowTimestamp;
+
+                try
+                {
+                    layerBellow.Move(ball, elapsedTime.TotalSeconds);
+
+                    lock (DataBallsLock)
                     {
-                        CollisionService.ResolveElasticCollision(FirstBall, SecondBall);
+                        ResolveCollisionsFor(ball);
                     }
+                }
+                catch (ObjectDisposedException) when (Disposed || cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+            }
+        }
+
+        private void ResolveCollisionsFor(Data.IBall movingBall)
+        {
+            foreach (Data.IBall otherBall in DataBalls)
+            {
+                if (ReferenceEquals(movingBall, otherBall))
+                    continue;
+
+                if(CollisionService.AreColliding(movingBall, otherBall))
+                {
+                    CollisionService.ResolveElasticCollision(movingBall, otherBall);
                 }
             }
         }

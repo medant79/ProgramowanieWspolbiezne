@@ -54,9 +54,10 @@ namespace TP.ConcurrentProgramming.BusinessLogic.Test
                 newInstance.Start(
                     numberOfBalls2Create,
                     (startingPosition, ball) => { called++; Assert.IsNotNull(startingPosition); Assert.IsNotNull(ball); });
-                Assert.AreEqual<int>(1, called);
+                Assert.AreEqual<int>(numberOfBalls2Create, called);
                 Assert.IsTrue(dataLayerFixcure.StartCalled);
                 Assert.IsTrue(SpinWait.SpinUntil(() => Volatile.Read(ref dataLayerFixcure.MoveCallCount) > 0, TimeSpan.FromSeconds(1)));
+                Assert.IsTrue(SpinWait.SpinUntil(() => dataLayerFixcure.MovedBallsCount == numberOfBalls2Create, TimeSpan.FromSeconds(1)));
                 Assert.IsTrue(dataLayerFixcure.LastDeltaTime >= 0.0);
                 Assert.AreEqual<int>(numberOfBalls2Create, dataLayerFixcure.NumberOfBallseCreated);
             }
@@ -74,7 +75,7 @@ namespace TP.ConcurrentProgramming.BusinessLogic.Test
                 throw new NotImplementedException();
             }
 
-            public override void Move(double deltaTime)
+            public override void Move(Data.IBall ball, double deltaTime)
             {
                 throw new NotImplementedException();
             }
@@ -94,7 +95,7 @@ namespace TP.ConcurrentProgramming.BusinessLogic.Test
                 throw new NotImplementedException();
             }
 
-            public override void Move(double deltaTime)
+            public override void Move(Data.IBall ball, double deltaTime)
             {
                 throw new NotImplementedException();
             }
@@ -105,6 +106,19 @@ namespace TP.ConcurrentProgramming.BusinessLogic.Test
             internal bool StartCalled = false;
             internal int MoveCallCount = 0;
             internal int NumberOfBallseCreated = -1;
+            private readonly object MovedBallsLock = new();
+            private readonly HashSet<Data.IBall> MovedBalls = [];
+
+            internal int MovedBallsCount
+            {
+                get
+                {
+                    lock (MovedBallsLock)
+                    {
+                        return MovedBalls.Count;
+                    }
+                }
+            }
 
             public override void Dispose()
             { }
@@ -113,32 +127,41 @@ namespace TP.ConcurrentProgramming.BusinessLogic.Test
             {
                 StartCalled = true;
                 NumberOfBallseCreated = numberOfBalls;
-                upperLayerHandler(new DataVectorFixture(), new DataBallFixture());
+                for (int i = 0; i < numberOfBalls; i++)
+                {
+                    DataVectorFixture position = new(i * 100.0, 0.0);
+                    upperLayerHandler(position, new DataBallFixture(position));
+                }
             }
 
             internal double LastDeltaTime = 0.0;
 
-            public override void Move(double deltaTime)
+            public override void Move(Data.IBall ball, double deltaTime)
             {
                 LastDeltaTime = deltaTime;
+                lock (MovedBallsLock)
+                {
+                    MovedBalls.Add(ball);
+                }
                 Interlocked.Increment(ref MoveCallCount);
             }
 
-            private record DataVectorFixture : Data.IVector
-            {
-                public double x { get; init; }
-                public double y { get; init; }
-            }
+            private record DataVectorFixture(double x, double y) : Data.IVector;
 
             private class DataBallFixture : Data.IBall
             {
-                public IVector Velocity { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+                internal DataBallFixture(IVector currentPosition)
+                {
+                    CurrentPosition = currentPosition;
+                }
+
+                public IVector Velocity { get; set; } = new DataVectorFixture(0.0, 0.0);
 
                 public double Mass => 1.0;
 
                 public double Diameter => 20.0;
 
-                public IVector CurrentPosition => throw new NotImplementedException();
+                public IVector CurrentPosition { get; }
 
                 public event EventHandler<IVector>? NewPositionNotification = null;
             }

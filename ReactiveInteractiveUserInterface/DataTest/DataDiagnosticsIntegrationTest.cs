@@ -19,9 +19,11 @@ namespace TP.ConcurrentProgramming.DataTest
 
             using (DataImplementation data = new(logger))
             {
-                data.Start(1, (position, ball) => { });
+                IBall? movingBall = null;
+                data.Start(1, (position, ball) => { movingBall = ball; });
 
-                data.Move(1.0);
+                Assert.IsNotNull(movingBall);
+                data.Move(movingBall, 1.0);
             }
 
             Assert.IsTrue(File.Exists(filePath));

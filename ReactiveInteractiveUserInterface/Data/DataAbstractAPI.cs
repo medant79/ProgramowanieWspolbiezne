@@ -10,13 +10,13 @@
 
 namespace TP.ConcurrentProgramming.Data
 {
-  public abstract class DataAbstractAPI : IDisposable
-  {
+    public abstract class DataAbstractAPI : IDisposable
+    {
     #region Layer Factory
 
     public static DataAbstractAPI GetDataLayer()
     {
-      return modelInstance.Value;
+        return modelInstance.Value;
     }
 
     #endregion Layer Factory
@@ -25,7 +25,7 @@ namespace TP.ConcurrentProgramming.Data
 
     public abstract void Start(int numberOfBalls, Action<IVector, IBall> upperLayerHandler);
 
-    public abstract void Move(double deltaTime);
+    public abstract void Move(IBall ball, double deltaTime);
 
     #endregion public API
 
@@ -40,10 +40,10 @@ namespace TP.ConcurrentProgramming.Data
     private static Lazy<DataAbstractAPI> modelInstance = new Lazy<DataAbstractAPI>(() => new DataImplementation());
 
     #endregion private
-  }
+    }
 
-  public interface IVector
-  {
+    public interface IVector
+    {
     /// <summary>
     /// The X component of the vector.
     /// </summary>
@@ -53,10 +53,10 @@ namespace TP.ConcurrentProgramming.Data
     /// The y component of the vector.
     /// </summary>
     double y { get; init; }
-  }
+    }
 
-  public interface IBall
-  {
+    public interface IBall
+    {
     event EventHandler<IVector> NewPositionNotification;
 
     IVector Velocity { get; set; }
@@ -66,5 +66,5 @@ namespace TP.ConcurrentProgramming.Data
     double Diameter { get; }
 
     IVector CurrentPosition { get; }
-  }
+    }
 }

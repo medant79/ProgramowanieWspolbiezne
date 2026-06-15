@@ -67,16 +67,16 @@ namespace TP.ConcurrentProgramming.Data
             }
         }
 
-        public override void Move(double deltaTime)
+        public override void Move(IBall ball, double deltaTime)
         {
             if (Disposed)
                 throw new ObjectDisposedException(nameof(DataImplementation));
+            if (ball == null)
+                throw new ArgumentNullException(nameof(ball));
+            if (ball is not Ball dataBall)
+                throw new ArgumentException("Ball must be created by this data layer.", nameof(ball));
 
-            lock (BallsListLock)
-            {
-                foreach (Ball item in BallsList)
-                    item.Move(_boardWidth, _boardHeight, _ballDiameter, deltaTime);
-            }
+            dataBall.Move(_boardWidth, _boardHeight, _ballDiameter, deltaTime);
         }
 
         #endregion DataAbstractAPI

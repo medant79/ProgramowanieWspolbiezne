@@ -73,10 +73,12 @@ namespace TP.ConcurrentProgramming.Data.Test
             using (DataImplementation newInstance = new DataImplementation())
             {
                 int numberOfCallbackInvoked = 0;
+                IBall? movingBall = null;
                 newInstance.Start(
                     1,
                     (startingPosition, ball) =>
                     {
+                        movingBall = ball;
                         ball.NewPositionNotification += (sender, position) =>
                         {
                             Assert.IsNotNull(sender);
@@ -86,7 +88,8 @@ namespace TP.ConcurrentProgramming.Data.Test
                     }
                 );
 
-                newInstance.Move(1.0);
+                Assert.IsNotNull(movingBall);
+                newInstance.Move(movingBall, 1.0);
 
                 Assert.AreEqual<int>(1, numberOfCallbackInvoked);
             }
@@ -115,9 +118,11 @@ namespace TP.ConcurrentProgramming.Data.Test
 
             using (DataImplementation newInstance = new DataImplementation(logger))
             {
-                newInstance.Start(1, (position, ball) => { });
+                IBall? movingBall = null;
+                newInstance.Start(1, (position, ball) => { movingBall = ball; });
 
-                newInstance.Move(1.0);
+                Assert.IsNotNull(movingBall);
+                newInstance.Move(movingBall, 1.0);
 
                 Assert.IsTrue(logger.LogCallCount > 0);
             }
