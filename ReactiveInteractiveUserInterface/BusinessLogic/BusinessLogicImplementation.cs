@@ -88,7 +88,7 @@ namespace TP.ConcurrentProgramming.BusinessLogic
         private bool Disposed = false;
 
         private readonly TimeProvider TimeProvider;
-        private static readonly TimeSpan FrameInterval = TimeSpan.FromMilliseconds(16);
+        private static readonly TimeSpan FrameInterval = TimeSpan.FromMilliseconds(1);
 
         private readonly UnderneathLayerAPI layerBellow;
 

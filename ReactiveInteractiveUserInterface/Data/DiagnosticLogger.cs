@@ -1,46 +1,92 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
+﻿using System.Collections.Concurrent;
 using System.Globalization;
-using System.Linq;
 using System.Text;
-using System.Threading.Channels;
-using System.Threading.Tasks;
 
 namespace TP.ConcurrentProgramming.Data
 {
     public class DiagnosticLogger : IDiagnosticLogger
     {
-        private readonly Channel<string> _channel;
-        private readonly CancellationTokenSource _cancellationTokenSource = new();
-        private readonly Task _writerTask;
+        private readonly ConcurrentQueue<string> _queue = new();
+        private readonly TimeProvider _timeProvider;
+        private readonly ITimer _flushTimer;
         private readonly string _filePath;
+        private readonly int _capacity;
 
+        private int _queuedMessagesCount = 0;
         private int _droppedMessagesCount = 0;
+        private int _flushInProgress = 0;
+        private int _disposed = 0;
 
-        public DiagnosticLogger(string filePath = "diagnostics.txt", int capacity = 10_000)
+        public DiagnosticLogger(
+            string filePath = "diagnostics.txt",
+            int capacity = 10_000,
+            TimeProvider? timeProvider = null)
         {
             _filePath = filePath;
+            _capacity = capacity;
+            _timeProvider = timeProvider ?? TimeProvider.System;
 
-            BoundedChannelOptions options = new(capacity)
-            {
-                FullMode = BoundedChannelFullMode.DropWrite,
-                SingleReader = true,
-                SingleWriter = false
-            };
+            string? directory = Path.GetDirectoryName(_filePath);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Directory.CreateDirectory(directory);
 
-            _channel = Channel.CreateBounded<string>(options);
-            _writerTask = Task.Run(WriteLoop);
+            _flushTimer = _timeProvider.CreateTimer(
+                FlushCallback,
+                null,
+                TimeSpan.FromMilliseconds(100),
+                TimeSpan.FromMilliseconds(100));
         }
 
         public int DroppedMessagesCount => _droppedMessagesCount;
 
         public void Log(BallDiagnosticData data)
         {
+            if (Volatile.Read(ref _disposed) == 1)
+                return;
+
             string line = Serialize(data);
 
-            if (!_channel.Writer.TryWrite(line))
+            int newCount = Interlocked.Increment(ref _queuedMessagesCount);
+
+            if (newCount > _capacity)
+            {
+                Interlocked.Decrement(ref _queuedMessagesCount);
                 Interlocked.Increment(ref _droppedMessagesCount);
+                return;
+            }
+
+            _queue.Enqueue(line);
+        }
+
+        private void FlushCallback(object? state)
+        {
+            Flush();
+        }
+
+        private void Flush()
+        {
+            if (Interlocked.Exchange(ref _flushInProgress, 1) == 1)
+                return;
+
+            try
+            {
+                List<string> lines = [];
+
+                while (_queue.TryDequeue(out string? line))
+                {
+                    Interlocked.Decrement(ref _queuedMessagesCount);
+                    lines.Add(line);
+                }
+
+                if (lines.Count == 0)
+                    return;
+
+                File.AppendAllLines(_filePath, lines, Encoding.ASCII);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _flushInProgress, 0);
+            }
         }
 
         private static string Serialize(BallDiagnosticData data)
@@ -56,36 +102,19 @@ namespace TP.ConcurrentProgramming.Data
                 data.Diameter.ToString(CultureInfo.InvariantCulture));
         }
 
-        private async Task WriteLoop()
-        {
-            using FileStream fileStream = new(
-                _filePath,
-                FileMode.Append,
-                FileAccess.Write,
-                FileShare.Read);
-
-            await foreach (string line in _channel.Reader.ReadAllAsync(_cancellationTokenSource.Token))
-            {
-                byte[] bytes = Encoding.ASCII.GetBytes(line + Environment.NewLine);
-                await fileStream.WriteAsync(bytes, 0, bytes.Length, _cancellationTokenSource.Token);
-                await fileStream.FlushAsync(_cancellationTokenSource.Token);
-            }
-        }
-
         public void Dispose()
         {
-            _channel.Writer.TryComplete();
-            _cancellationTokenSource.CancelAfter(2000);
+            if (Interlocked.Exchange(ref _disposed, 1) == 1)
+                return;
 
-            try
-            {
-                _writerTask.Wait();
-            }
-            catch
-            {
-            }
+            _flushTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _flushTimer.Dispose();
 
-            _cancellationTokenSource.Dispose();
+            SpinWait.SpinUntil(
+                () => Volatile.Read(ref _flushInProgress) == 0,
+                TimeSpan.FromSeconds(2));
+
+            Flush();
         }
     }
 }
